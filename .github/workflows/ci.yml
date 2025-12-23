@@ -1,0 +1,66 @@
+name: CI
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+
+env:
+  PIP_DISABLE_PIP_VERSION_CHECK: "1"
+  PYTHONDONTWRITEBYTECODE: "1"
+  # дефолт как в GitLab
+  SEARCH_TARGET: "42"
+
+jobs:
+  build_lint:
+    name: Lint (ruff)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"   # аналог python:3.12-slim
+
+      - name: Install Ruff
+        run: |
+          python -V
+          python -m pip install --upgrade pip
+          pip install ruff
+      - name: Run Ruff
+        run: |
+          ruff --version
+          ruff check main.py
+
+  test_pytest:
+    name: Tests (pytest + run main.py)
+    runs-on: ubuntu-latest
+    needs: build_lint
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install pytest
+        run: |
+          python -V
+          python -m pip install --upgrade pip
+          pip install pytest
+
+      - name: Run tests
+        run: pytest -q
+
+      - name: Run app with SEARCH_TARGET
+        env:
+          # можно переопределить через Secrets/Variables репозитория
+          SEARCH_TARGET: ${{ env.SEARCH_TARGET }}
+        run: |
+          echo "RUN python main.py $SEARCH_TARGET"
+          python main.py "$SEARCH_TARGET"
+
