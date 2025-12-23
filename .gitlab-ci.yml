@@ -1,0 +1,37 @@
+stages:
+  - build
+  - test
+
+variables:
+  PIP_DISABLE_PIP_VERSION_CHECK: "1"
+  PYTHONDONTWRITEBYTECODE: "1"
+  # дефолт на случай локального запуска без переменной в GitLab
+  SEARCH_TARGET: "42"
+
+# Линтер как "сборка"
+build:lint:
+  stage: build
+  image: python:3.12-slim
+  tags: [docker]          # тот самый тег, что указал при регистрации
+  before_script:
+    - python -V
+    - pip install --upgrade pip
+    - pip install ruff
+  script:
+    - ruff --version
+    - ruff check main.py
+
+# Тесты + запуск приложения с параметром из окружения GitLab
+test:pytest:
+  stage: test
+  image: python:3.12-slim
+  tags: [docker]
+  before_script:
+    - python -V
+    - pip install --upgrade pip
+    - pip install pytest
+  script:
+    - pytest -q
+    - echo "RUN python main.py $SEARCH_TARGET"
+    - python main.py "$SEARCH_TARGET"
+
