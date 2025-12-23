@@ -8,7 +8,6 @@ on:
 env:
   PIP_DISABLE_PIP_VERSION_CHECK: "1"
   PYTHONDONTWRITEBYTECODE: "1"
-  # дефолт как в GitLab
   SEARCH_TARGET: "42"
 
 jobs:
@@ -22,17 +21,18 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: "3.12"   # аналог python:3.12-slim
+          python-version: "3.12"
 
       - name: Install Ruff
         run: |
           python -V
           python -m pip install --upgrade pip
           pip install ruff
+
       - name: Run Ruff
         run: |
           ruff --version
-          ruff check main.py
+          ruff check main.py app.py
 
   test_pytest:
     name: Tests (pytest + run main.py)
@@ -58,9 +58,41 @@ jobs:
 
       - name: Run app with SEARCH_TARGET
         env:
-          # можно переопределить через Secrets/Variables репозитория
           SEARCH_TARGET: ${{ env.SEARCH_TARGET }}
         run: |
           echo "RUN python main.py $SEARCH_TARGET"
           python main.py "$SEARCH_TARGET"
 
+  deploy_compose:
+    name: Deploy via Docker Compose
+    runs-on: ubuntu-latest
+    needs: test_pytest
+    if: github.ref == 'refs/heads/main'
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # При необходимости: логин в регистри (пример для GHCR)
+      # - name: Login to GitHub Container Registry
+      #   uses: docker/login-action@v3
+      #   with:
+      #     registry: ghcr.io
+      #     username: ${{ github.actor }}
+      #     password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Show Docker versions
+        run: |
+          docker version
+          docker compose version || echo "docker compose v2"
+
+      - name: Docker Compose up
+        env:
+          DOCKER_HOST: unix:///var/run/docker.sock
+        run: |
+          docker compose -f docker-compose.yml up -d --build
